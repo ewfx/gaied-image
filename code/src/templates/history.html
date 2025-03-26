@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Processing History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* ... (your existing history page styles) ... */
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Gen AI Orchestrator</div>
+        <div class="team-identifier">
+            <span class="team-name-styled">IMAGE</span>
+        </div>
+        <div class="user">DEVINULL</div>
+    </div>
+    <div class="container">
+        <div class="navigation">
+            <a href="/">Upload & Process</a>
+            <a href="/configure">Configure Request Types</a>
+            <a href="/history" class="active">Processing History</a>
+        </div>
+        <div class="content-section history-section">
+            <h2>Processing History</h2>
+            {% if history %}
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Filename</th>
+                        <th>Processing Date</th>
+                        <th>Primary Intent</th>
+                        <th>Summary</th>
+                        <th>Request Types</th>
+                        <th>Extracted Data</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in history %}
+                    <tr>
+                        <td>{{ item.id }}</td>
+                        <td>{{ item.filename }}</td>
+                        <td>{{ item.processing_date }}</td>
+                        <td>{{ item.primary_intent or 'N/A' }}</td>
+                        <td>{{ item.summary or 'N/A' }}</td>
+                        <td>
+                            {% if item.request_types %}
+                                <ul>
+                                {% for rt in item.request_types %}
+                                    <li>{{ rt.get('request_type', 'N/A') }} {% if rt.get('confidence') %} ({{ '%.2f' % (rt.confidence * 100) }}%) {% endif %}</li>
+                                {% endfor %}
+                                </ul>
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.extracted_data %}
+                                <ul>
+                                {% for key, value in item.extracted_data.items() %}
+                                    <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                {% endfor %}
+                                </ul>
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('view_processed_item', id=item.id) }}" class="button-small">View Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No processing history available.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Uploaded File</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" 
+          integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" 
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        .email-preview {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .email-preview h3 {
+            margin-top: 0;
+        }
+        .email-preview p {
+            margin-bottom: 8px;
+        }
+        .email-preview .attachments {
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Gen AI Orchestrator</div>
+        <div class="team-identifier">
+            <span class="team-name-styled">IMAGE</span>
+        </div>
+        <div class="user">DEVINULL</div>
+    </div>
+    
+    <div class="container">
+        <div class="navigation">
+            <a href="/">Upload & Process</a>
+            <a href="/configure">Configure Request Types</a>
+            <a href="/history">Processing History</a>
+        </div>
+
+        <div class="content-section process-section">
+            <h2>Process File: {{ filename }}</h2>
+
+            <form method="POST" action="/process_email">
+                {{ form.hidden_tag() }}
+                <button type="submit" class="button">{{ form.submit.label.text }}</button>
+            </form>
+
+            {% if email_preview %}
+            <div class="email-preview">
+                <h3>File Preview</h3>
+                {% if email_preview.subject %}
+                <p><strong>Subject:</strong> {{ email_preview.subject }}</p>
+                {% endif %}
+                {% if email_preview.sender %}
+                <p><strong>From:</strong> {{ email_preview.sender }}</p>
+                {% endif %}
+                {% if email_preview.recipient %}
+                <p><strong>To:</strong> {{ email_preview.recipient }}</p>
+                {% endif %}
+                {% if email_preview.date %}
+                <p><strong>Date:</strong> {{ email_preview.date }}</p>
+                {% endif %}
+                {% if email_preview.attachments %}
+                <p class="attachments"><strong>Attachments:</strong> {{ ', '.join(email_preview.attachments) }}</p>
+                {% endif %}
+                {% if email_preview.body_snippet %}
+                <p><strong>Body Preview:</strong> {{ email_preview.body_snippet }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Processed Item Details</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* Add some basic styling for the details page */
+        .detail-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .detail-section h4 {
+            margin-top: 0;
+        }
+        .detail-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .detail-list li {
+            margin-bottom: 8px;
+        }
+        .detail-list li strong {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Gen AI Orchestrator</div>
+        <div class="team-identifier">
+            <span class="team-name-styled">IMAGE</span>
+        </div>
+        <div class="user">DEVINULL</div>
+    </div>
+    <div class="container">
+        <div class="navigation">
+            <a href="/">Upload & Process</a>
+            <a href="/configure">Configure Request Types</a>
+            <a href="/history">Processing History</a>
+        </div>
+        <div class="content-section detail-view">
+            <h2>Processed Item Details</h2>
+
+            <div class="detail-section">
+                <h4>File Information</h4>
+                <ul class="detail-list">
+                    <li><strong>Filename:</strong> {{ processed_item.filename }}</li>
+                    <li><strong>Processing Date:</strong> {{ processed_item.processing_date }}</li>
+                    <li><strong>Primary Intent:</strong> {{ processed_item.primary_intent or 'N/A' }}</li>
+                    <li><strong>Summary:</strong> {{ processed_item.summary or 'N/A' }}</li>
+                </ul>
+            </div>
+
+            {% if email_preview %}
+            <div class="detail-section">
+                <h4>File Preview</h4>
+                {% if email_preview.subject %}
+                <p><strong>Subject:</strong> {{ email_preview.subject }}</p>
+                {% endif %}
+                {% if email_preview.sender %}
+                <p><strong>From:</strong> {{ email_preview.sender }}</p>
+                {% endif %}
+                {% if email_preview.recipient %}
+                <p><strong>To:</strong> {{ email_preview.recipient }}</p>
+                {% endif %}
+                {% if email_preview.date %}
+                <p><strong>Date:</strong> {{ email_preview.date }}</p>
+                {% endif %}
+                {% if email_preview.attachments %}
+                <p><strong>Attachments:</strong> {{ ', '.join(email_preview.attachments) }}</p>
+                {% endif %}
+                {% if email_preview.get('body') %}
+                <details>
+                    <summary>Show Full Body</summary>
+                    <pre>{{ email_preview.body }}</pre>
+                </details>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="detail-section">
+                <h4>Identified Request Types</h4>
+                {% if request_types %}
+                <ul class="detail-list">
+                    {% for rt in request_types %}
+                    <li>
+                        <strong>{{ rt.get('request_type', 'N/A') }}</strong>
+                        {% if rt.get('confidence') %} (Confidence: {{ '%.2f' % (rt.confidence * 100) }}%) {% endif %}
+                        {% if rt.get('sub_classifications') %}
+                        <ul>
+                            {% for sub_rt in rt.sub_classifications %}
+                            <li>{{ sub_rt }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No request types identified.</p>
+                {% endif %}
+            </div>
+
+            <div class="detail-section">
+                <h4>Extracted Data</h4>
+                {% if extracted_data %}
+                <ul class="detail-list">
+                    {% for key, value in extracted_data.items() %}
+                    <li><strong>{{ key }}:</strong> {{ value }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No extracted data.</p>
+                {% endif %}
+            </div>
+
+            <div class="actions">
+                <a href="{{ url_for('history') }}" class="button">Back to History</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
