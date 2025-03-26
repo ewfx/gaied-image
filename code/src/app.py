@@ -17,6 +17,7 @@ import json
 from docx import Document
 from dotenv import load_dotenv
 from ai_integration import analyze_text  # Import the Gemini integration
+import logging
 
 load_dotenv()
 
@@ -27,6 +28,10 @@ db.init_app(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 def initialize_default_request_types():
     with app.app_context():
         for rt_name in app.config['DEFAULT_REQUEST_TYPES']:
@@ -34,10 +39,12 @@ def initialize_default_request_types():
                 default_rt = RequestType(name=rt_name)
                 db.session.add(default_rt)
         db.session.commit()
+        logger.info("Default request types initialized.")
 
 def create_tables():
     with app.app_context():
         db.create_all()
+        logger.info("Database tables created.")
 
 @app.before_request
 def before_request_func():
@@ -56,26 +63,31 @@ def generate_email_hash(filepath):
 
 def parse_eml_content(filepath):
     parser = EmlParser(include_raw_body=True, include_attachment_data=False)
-    with open(filepath, 'rb') as f:
-        eml = parser.decode(f.read())
-    subject = eml.get('subject')
-    from_addr = eml.get('from')
-    to_addr = eml.get('to')
-    date_obj = eml.get('date')
-    date_str = datetime.strftime(date_obj, '%Y-%m-%d %H:%M:%S') if date_obj else "N/A"
-    body_parts = eml.get_body()
-    body_text = ""
-    if body_parts:
-        plain_text_body = next((part[1] for part in body_parts if part[0] == 'text/plain'), None)
-        if plain_text_body:
-            body_text = plain_text_body
-        else:
-            html_body = next((part[1] for part in body_parts if part[0] == 'text/html'), None)
-            if html_body:
-                soup = BeautifulSoup(html_body, 'html.parser')
-                body_text = soup.get_text(separator='\n')
-    attachments = [att.get('filename') for att in eml.get_attachments()]
-    return {'subject': subject, 'sender': from_addr, 'recipient': to_addr, 'date': date_str, 'body': body_text, 'attachments': attachments}
+    try:
+        with open(filepath, 'rb') as f:
+            eml = parser.decode(f.read())
+        subject = eml.get('subject')
+        from_addr = eml.get('from')
+        to_addr = eml.get('to')
+        date_obj = eml.get('date')
+        date_str = datetime.strftime(date_obj, '%Y-%m-%d %H:%M:%S') if date_obj else "N/A"
+        body_parts = eml.get_body()
+        body_text = ""
+        if body_parts:
+            plain_text_body = next((part[1] for part in body_parts if part[0] == 'text/plain'), None)
+            if plain_text_body:
+                body_text = plain_text_body
+            else:
+                html_body = next((part[1] for part in body_parts if part[0] == 'text/html'), None)
+                if html_body:
+                    soup = BeautifulSoup(html_body, 'html.parser')
+                    body_text = soup.get_text(separator='\n')
+        attachments = [att.get('filename') for att in eml.get_attachments()]
+        logger.info(f"EML parsed successfully: {filepath}")
+        return {'subject': subject, 'sender': from_addr, 'recipient': to_addr, 'date': date_str, 'body': body_text, 'attachments': attachments}
+    except Exception as e:
+        logger.error(f"Error parsing EML: {filepath} - {e}")
+        return {'subject': None, 'sender': None, 'recipient': None, 'date': None, 'body': "", 'attachments': []}
 
 def extract_text_from_pdf(filepath):
     text = ""
@@ -85,9 +97,11 @@ def extract_text_from_pdf(filepath):
             for page_num in range(len(pdf_reader.pages)):
                 page = pdf_reader.pages[page_num]
                 text += page.extract_text()
+        logger.info(f"Text extracted from PDF: {filepath}")
+        return text
     except Exception as e:
-        print(f"Error reading PDF: {e}")
-    return text
+        logger.error(f"Error reading PDF: {filepath} - {e}")
+        return ""
 
 def extract_text_from_docx(filepath):
     text = ""
@@ -95,9 +109,11 @@ def extract_text_from_docx(filepath):
         document = Document(filepath)
         for paragraph in document.paragraphs:
             text += paragraph.text + "\n"
+        logger.info(f"Text extracted from DOCX: {filepath}")
+        return text
     except Exception as e:
-        print(f"Error reading DOCX file: {e}")
-    return text
+        logger.error(f"Error reading DOCX file: {filepath} - {e}")
+        return ""
 
 class UploadFileForm(FlaskForm):
     file = FileField("Select File", validators=[DataRequired()])
@@ -147,9 +163,11 @@ def upload_file_page():
                 file.save(filepath)
                 session['uploaded_filepath'] = filepath
                 session['uploaded_filename'] = filename
+                logger.info(f"File uploaded successfully: {filepath}")
                 return redirect(url_for('process_email_page'))
             except Exception as e:
                 flash(f'Error saving file: {e}', 'error')
+                logger.error(f"Error saving file: {filepath} - {e}")
                 return redirect(request.url)
         else:
             flash(f'Invalid file type. Allowed types: {", ".join(app.config["UPLOAD_EXTENSIONS"])}', 'error')
@@ -174,6 +192,7 @@ def configure_request_types():
                 new_rt = RequestType(name=name, description=description, keywords=keywords_str)
                 db.session.add(new_rt)
                 db.session.commit()
+                logger.info(f"Request type '{name}' added.")
                 return jsonify({'success': True, 'message': f"Request type '{name}' added successfully.", 'request_type': new_rt.as_dict()})
             else:
                 return jsonify({'success': False, 'error': f"Request type '{name}' already exists."})
@@ -186,6 +205,7 @@ def configure_request_types():
                 rt_to_update.description = edit_form.description.data.strip()
                 rt_to_update.keywords = edit_form.keywords.data.strip()
                 db.session.commit()
+                logger.info(f"Request type '{rt_to_update.name}' updated.")
                 return jsonify({'success': True, 'message': f"Request type '{rt_to_update.name}' updated successfully.", 'request_type': rt_to_update.as_dict()})
             else:
                 return jsonify({'success': False, 'error': 'Request type not found for editing.'})
@@ -211,6 +231,7 @@ def delete_request_type(id):
         if request_type:
             db.session.delete(request_type)
             db.session.commit()
+            logger.info(f"Request type '{request_type.name}' deleted.")
             return jsonify({'success': True, 'message': f"Request type '{request_type.name}' deleted successfully."})
         else:
             return jsonify({'error': 'Request type not found.'})
@@ -225,109 +246,192 @@ def toggle_presets():
 
 @app.route('/process_email', methods=['GET', 'POST'])
 def process_email_page():
-    if 'uploaded_filepath' not in session:
-        return redirect(url_for('upload_file_page'))
-
-    filepath = session['uploaded_filepath']
-    filename = session['uploaded_filename']
-    file_extension = filename.rsplit('.', 1)[-1].lower()
-
-    # Instantiate the form
     form = ProcessEmailForm()
+    filename = request.args.get('filename', None)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename) if filename else None
 
-    with app.app_context():
-        custom_request_types = RequestType.query.filter(
-            RequestType.name.notin_(app.config['DEFAULT_REQUEST_TYPES'])
-        ).all()
-        custom_request_type_keywords = {
-            rt.name: [keyword.strip() for keyword in rt.keywords.split(',') if keyword.strip()]
-            for rt in custom_request_types
-        }
+    if not filename or not os.path.exists(filepath):
+        flash("No file found for processing.", "error")
+        return redirect(url_for('index'))
 
-        preview_data = {'subject': filename, 'attachments': [], 'body_snippet': 'Preview not available.'}
+    # Extract email content
+    preview_data = {'subject': filename, 'attachments': [], 'body_snippet': 'Preview not available.'}
+    extracted_text = "This request is for Money Inbound"
+    
+    if form.validate_on_submit():
+        try:
+            logger.info("Calling analyze_text with extracted text...")
+            ai_analysis_results = analyze_text(extracted_text)
+            logger.info(f"AI analysis results: {ai_analysis_results}")
+        except Exception as e:
+            logger.error(f"Error during AI analysis: {e}")
+            ai_analysis_results = {'error': f'Error during AI analysis: {e}'}
 
-        if file_extension == 'eml':
-            preview_data = parse_eml_content(filepath)
-            preview_data['body_snippet'] = preview_data.get('body', '')[:200] + "..." if preview_data.get('body') else "No body."
-        elif file_extension == 'pdf':
-            preview_data['body_snippet'] = extract_text_from_pdf(filepath)[:200] + "..." if extract_text_from_pdf(filepath) else "No text extracted."
-        elif file_extension == 'docx':
-            preview_data['body_snippet'] = extract_text_from_docx(filepath)[:200] + "..." if extract_text_from_docx(filepath) else "No text extracted."
-        # Handle other file types for preview if needed
+        # Enhanced Request Type Matching
+        enhanced_request_types = []
+        custom_request_type_keywords = {}  # Ensure this dictionary is defined
 
-        if form.validate_on_submit():
-            email_hash = generate_email_hash(filepath)
-            existing_email = ProcessedEmail.query.filter_by(email_hash=email_hash).first()
+        if 'request_types' in ai_analysis_results and isinstance(ai_analysis_results['request_types'], list):
+            for ai_rt in ai_analysis_results['request_types']:
+                matched_custom_rt = None
+                if isinstance(ai_rt, dict) and 'request_type' in ai_rt:
+                    for custom_name, custom_keywords in custom_request_type_keywords.items():
+                        if custom_name.lower() in ai_rt['request_type'].lower() or \
+                           any(keyword.lower() in extracted_text.lower() for keyword in custom_keywords):
+                            matched_custom_rt = custom_name
+                            break
 
-            if file_extension == 'eml':
-                preview_data = parse_eml_content(filepath)
-            elif file_extension == 'pdf':
-                preview_data['body_snippet'] = extract_text_from_pdf(filepath)[:200] + "..." if extract_text_from_pdf(filepath) else "No text extracted."
-            elif file_extension == 'docx':
-                preview_data['body_snippet'] = extract_text_from_docx(filepath)[:200] + "..." if extract_text_from_docx(filepath) else "No text extracted."
+                    if matched_custom_rt:
+                        enhanced_request_types.append({
+                            'request_type': matched_custom_rt,
+                            'confidence': ai_rt.get('confidence', None),
+                            'sub_classifications': ai_rt.get('sub_classifications', []),
+                            'from_custom': True
+                        })
+                    else:
+                        enhanced_request_types.append(ai_rt)
 
-            if existing_email:
-                return render_template('processing_output.html', upload_successful=True, is_duplicate=True,
-                                       email_preview=preview_data, attachments=preview_data.get('attachments', []),
-                                       extracted_data={}, ai_analysis={})
-            else:
-                extracted_text = ""
-                if file_extension == 'eml':
-                    extracted_text = preview_data.get('body', '')
-                elif file_extension == 'pdf':
-                    extracted_text = extract_text_from_pdf(filepath)
-                elif file_extension == 'docx':
-                    extracted_text = extract_text_from_docx(filepath)
-                # Handle other file types similarly
+            ai_analysis_results['request_types'] = enhanced_request_types
+        elif 'request_types' not in ai_analysis_results:
+            ai_analysis_results['request_types'] = []
 
-                try:
-                    ai_analysis_results = analyze_text(extracted_text)
-                except Exception as e:
-                    print(f"Error during AI analysis: {e}")
-                    ai_analysis_results = {'error': f'Error during AI analysis: {e}'}
+        # Save to database
+        new_processed_email = ProcessedEmail(
+            filename=filename,
+            filepath=filepath,
+            primary_intent=ai_analysis_results.get('primary_intent'),
+            summary=ai_analysis_results.get('summary'),
+            request_types_json=json.dumps(ai_analysis_results.get('request_types', [])),
+            extracted_data_json=json.dumps(ai_analysis_results.get('extracted_data', {}))
+        )
+        db.session.add(new_processed_email)
+        db.session.commit()
 
-                if 'request_types' in ai_analysis_results and isinstance(ai_analysis_results['request_types'], list):
-                    enhanced_request_types = []
-                    for ai_rt in ai_analysis_results['request_types']:
-                        matched_custom_rt = None
-                        if isinstance(ai_rt, dict) and 'request_type' in ai_rt:
-                            for custom_name, custom_keywords in custom_request_type_keywords.items():
-                                if custom_name.lower() in ai_rt['request_type'].lower() or \
-                                   any(keyword.lower() in extracted_text.lower() for keyword in custom_keywords):
-                                    matched_custom_rt = custom_name
-                                    break
-                            if matched_custom_rt:
-                                enhanced_request_types.append({
-                                    'request_type': matched_custom_rt,
-                                    'confidence': ai_rt.get('confidence', None),
-                                    'sub_classifications': ai_rt.get('sub_classifications', []),
-                                    'from_custom': True
-                                })
-                            else:
-                                enhanced_request_types.append(ai_rt)
-                    ai_analysis_results['request_types'] = enhanced_request_types
-                elif 'request_types' not in ai_analysis_results:
-                    ai_analysis_results['request_types'] = []
+        logger.info(f"Processing complete for {filename}. AI Analysis: {ai_analysis_results}")
 
-                new_processed_email = ProcessedEmail(
-                    filename=filename,
-                    filepath=filepath,
-                    email_hash=email_hash,
-                    primary_intent=ai_analysis_results.get('primary_intent'),
-                    summary=ai_analysis_results.get('summary'),
-                    request_types_json=json.dumps(ai_analysis_results.get('request_types', [])),
-                    extracted_data_json=json.dumps(ai_analysis_results.get('extracted_data', {}))
-                )
-                db.session.add(new_processed_email)
-                db.session.commit()
-
-                return render_template('processing_output.html', upload_successful=True, is_duplicate=False,
-                                       email_preview=preview_data, attachments=preview_data.get('attachments', []),
-                                       extracted_data=ai_analysis_results.get('extracted_data', {}),
-                                       ai_analysis=ai_analysis_results,
-                                       processed_email_id=new_processed_email.id)
+        return render_template('processing_output.html',
+                               upload_successful=True,
+                               is_duplicate=False,
+                               email_preview=preview_data,
+                               attachments=preview_data.get('attachments', []),
+                               extracted_data=ai_analysis_results.get('extracted_data', {}),
+                               ai_analysis=ai_analysis_results,
+                               processed_email_id=new_processed_email.id)
 
     return render_template('process_email.html', filename=filename, email_preview=preview_data, form=form)
+
+
+# @app.route('/process_email', methods=['GET', 'POST'])
+# def process_email_page():
+#     if 'uploaded_filepath' not in session:
+#         return redirect(url_for('upload_file_page'))
+
+#     filepath = session['uploaded_filepath']
+#     filename = session['uploaded_filename']
+#     file_extension = filename.rsplit('.', 1)[-1].lower()
+
+#     # Instantiate the form
+#     form = ProcessEmailForm()
+
+#     with app.app_context():
+#         custom_request_types = RequestType.query.filter(
+#             RequestType.name.notin_(app.config['DEFAULT_REQUEST_TYPES'])
+#         ).all()
+#         custom_request_type_keywords = {
+#             rt.name: [keyword.strip() for keyword in rt.keywords.split(',') if keyword.strip()]
+#             for rt in custom_request_types
+#         }
+
+#         preview_data = {'subject': filename, 'attachments': [], 'body_snippet': 'Preview not available.'}
+
+#         if file_extension == 'eml':
+#             preview_data = parse_eml_content(filepath)
+#             preview_data['body_snippet'] = preview_data.get('body', '')[:200] + "..." if preview_data.get('body') else "No body."
+#         elif file_extension == 'pdf':
+#             preview_data['body_snippet'] = extract_text_from_pdf(filepath)[:200] + "..." if extract_text_from_pdf(filepath) else "No text extracted."
+#         elif file_extension == 'docx':
+#             preview_data['body_snippet'] = extract_text_from_docx(filepath)[:200] + "..." if extract_text_from_docx(filepath) else "No text extracted."
+#         # Handle other file types for preview if needed
+
+#         if form.validate_on_submit():
+#             email_hash = generate_email_hash(filepath)
+#             existing_email = ProcessedEmail.query.filter_by(email_hash=email_hash).first()
+
+#             if file_extension == 'eml':
+#                 preview_data = parse_eml_content(filepath)
+#             elif file_extension == 'pdf':
+#                 preview_data['body_snippet'] = extract_text_from_pdf(filepath)[:200] + "..." if extract_text_from_pdf(filepath) else "No text extracted."
+#             elif file_extension == 'docx':
+#                 preview_data['body_snippet'] = extract_text_from_docx(filepath)[:200] + "..." if extract_text_from_docx(filepath) else "No text extracted."
+
+#             if existing_email:
+#                 logger.info(f"Duplicate file detected: {filename} (hash: {email_hash})")
+#                 return render_template('processing_output.html', upload_successful=True, is_duplicate=True,
+#                                        email_preview=preview_data, attachments=preview_data.get('attachments', []),
+#                                        extracted_data=json.loads(existing_email.extracted_data_json) if existing_email.extracted_data_json else {},
+#                                        ai_analysis=json.loads(existing_email.request_types_json) if existing_email.request_types_json else {})
+#             else:
+#                 extracted_text = ""
+#                 if file_extension == 'eml':
+#                     extracted_text = preview_data.get('body', '')
+#                 elif file_extension == 'pdf':
+#                     extracted_text = extract_text_from_pdf(filepath)
+#                 elif file_extension == 'docx':
+#                     extracted_text = extract_text_from_docx(filepath)
+#                 # Handle other file types similarly
+#                 logger.info(f"Extracted text from {filename}: {extracted_text[:100]}...")
+
+#                 try:
+#                     logger.info("Calling analyze_text...")
+#                     ai_analysis_results = analyze_text(extracted_text)
+#                     logger.info(f"AI analysis results: {ai_analysis_results}")
+#                 except Exception as e:
+#                     logger.error(f"Error during AI analysis: {e}")
+#                     ai_analysis_results = {'error': f'Error during AI analysis: {e}'}
+
+#                 enhanced_request_types = []
+#                 if 'request_types' in ai_analysis_results and isinstance(ai_analysis_results['request_types'], list):
+#                     for ai_rt in ai_analysis_results['request_types']:
+#                         matched_custom_rt = None
+#                         if isinstance(ai_rt, dict) and 'request_type' in ai_rt:
+#                             for custom_name, custom_keywords in custom_request_type_keywords.items():
+#                                 if custom_name.lower() in ai_rt['request_type'].lower() or \
+#                                    any(keyword.lower() in extracted_text.lower() for keyword in custom_keywords):
+#                                     matched_custom_rt = custom_name
+#                                     break
+#                             if matched_custom_rt:
+#                                 enhanced_request_types.append({
+#                                     'request_type': matched_custom_rt,
+#                                     'confidence': ai_rt.get('confidence', None),
+#                                     'sub_classifications': ai_rt.get('sub_classifications', []),
+#                                     'from_custom': True
+#                                 })
+#                             else:
+#                                 enhanced_request_types.append(ai_rt)
+#                     ai_analysis_results['request_types'] = enhanced_request_types
+#                 elif 'request_types' not in ai_analysis_results:
+#                     ai_analysis_results['request_types'] = []
+
+#                 new_processed_email = ProcessedEmail(
+#                     filename=filename,
+#                     filepath=filepath,
+#                     email_hash=email_hash,
+#                     primary_intent=ai_analysis_results.get('primary_intent'),
+#                     summary=ai_analysis_results.get('summary'),
+#                     request_types_json=json.dumps(ai_analysis_results.get('request_types', [])),
+#                     extracted_data_json=json.dumps(ai_analysis_results.get('extracted_data', {}))
+#                 )
+#                 db.session.add(new_processed_email)
+#                 db.session.commit()
+#                 logger.info(f"Processing complete for {filename}. AI Analysis: {ai_analysis_results}")
+
+#                 return render_template('processing_output.html', upload_successful=True, is_duplicate=False,
+#                                        email_preview=preview_data, attachments=preview_data.get('attachments', []),
+#                                        extracted_data=ai_analysis_results.get('extracted_data', {}),
+#                                        ai_analysis=ai_analysis_results,
+#                                        processed_email_id=new_processed_email.id)
+
+#     return render_template('process_email.html', filename=filename, email_preview=preview_data, form=form)
 
 @app.route('/save_feedback/<int:id>', methods=['POST'])
 def save_feedback(id):
@@ -342,9 +446,11 @@ def save_feedback(id):
             processed_email.extracted_data_json = json.dumps(edited_extracted_data)
             db.session.commit()
             flash('Feedback saved successfully.', 'success')
+            logger.info(f"Feedback saved for processed email ID: {id}")
             return redirect(url_for('processing_history'))
         else:
             flash('Error saving feedback.', 'error')
+            logger.error(f"Error saving feedback for processed email ID: {id}")
             return redirect(url_for('processing_history'))
 
 @app.route('/history')
@@ -362,6 +468,7 @@ def processing_history():
                 'request_types': json.loads(email.request_types_json) if email.request_types_json else [],
                 'extracted_data': json.loads(email.extracted_data_json) if email.extracted_data_json else {}
             })
+        logger.info("Accessed processing history.")
         return render_template('history.html', history=history_data)
 
 @app.route('/history/view/<int:id>')
@@ -383,13 +490,13 @@ def view_processed_item(id):
                     email_preview_data['attachments'] = [processed_email.filename]
                     email_preview_data['body_snippet'] = extract_text_from_docx(processed_email.filepath)[:200] + "..."
         except Exception as e:
-            print(f"Error generating preview for {processed_email.filename}: {e}")
+            logger.error(f"Error generating preview for {processed_email.filename} (ID: {id}): {e}")
 
         feedback_form = SaveFeedbackForm(
             request_types_json=processed_email.request_types_json,
             extracted_data_json=processed_email.extracted_data_json
         )
-
+        logger.info(f"Viewing processed item ID: {id}")
         return render_template('view_processed.html',
                                processed_item=processed_email,
                                request_types=json.loads(processed_email.request_types_json) if processed_email.request_types_json else [],
@@ -400,9 +507,11 @@ def view_processed_item(id):
 @app.route('/reset_presets', methods=['POST'])
 def reset_presets():
     with app.app_context():
-        RequestType.query.filter(RequestType.name.notin_(app.config['DEFAULT_REQUEST_TYPES'])).delete()
+        deleted_count = RequestType.query.filter(RequestType.name.notin_(app.config['DEFAULT_REQUEST_TYPES'])).delete()
         db.session.commit()
+        logger.info(f"Reset custom presets. {deleted_count} custom request types deleted.")
         return redirect(url_for('configure_request_types'))
 
 if __name__ == '__main__':
+    logger.info("Application started.")
     app.run(debug=True)
