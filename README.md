@@ -24,6 +24,27 @@ A brief overview of your project and its purpose. Mention which problem statemen
 ## Landing Page
 ![image](https://github.com/user-attachments/assets/897f4224-7d5c-4eef-a050-0801a0e6e4ac)
 
+## File Uploading
+![image](https://github.com/user-attachments/assets/19b93dc1-08db-41fa-b273-1e3764a69e21)
+
+## Duplicate Detection
+![image](https://github.com/user-attachments/assets/d542e544-116a-4c48-a46c-a7dee0fdebac)
+
+## Triage Results
+![image](https://github.com/user-attachments/assets/7a6094cd-6d95-4a01-bffa-80ff46cb112b)
+
+## AI Analysis
+![image](https://github.com/user-attachments/assets/8dc9366f-ad55-45d3-8f31-2d7f72b595ba)
+
+## Configuring Request Types
+![image](https://github.com/user-attachments/assets/40977f94-db7d-4f7c-9160-c890688e5c5e)
+
+## List of Request Types
+![image](https://github.com/user-attachments/assets/03ab628d-0d56-40c9-913f-9400ceeb80df)
+
+## Classification based on New Request Type (Schedule Adjustment)
+![image](https://github.com/user-attachments/assets/a022ff2c-9e35-4c74-803a-431b31716d35)
+
 
 ## 💡 Inspiration
 What inspired you to create this project? Describe the problem you're solving.
