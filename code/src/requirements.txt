@@ -1,0 +1,10 @@
+streamlit
+pandas
+scikit-learn
+transformers
+datasets
+evaluate
+torch
+PyPDF2
+google-generativeai
+fpdf
