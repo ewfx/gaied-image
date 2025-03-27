@@ -21,7 +21,9 @@ A brief overview of your project and its purpose. Mention which problem statemen
 📹 [Video Demo](#) (if applicable)  
 🖼️ Screenshots:
 
-![Screenshot 1](link-to-image)
+## Landing Page
+![image](https://github.com/user-attachments/assets/897f4224-7d5c-4eef-a050-0801a0e6e4ac)
+
 
 ## 💡 Inspiration
 What inspired you to create this project? Describe the problem you're solving.
